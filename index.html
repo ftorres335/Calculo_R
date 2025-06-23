@@ -2,43 +2,40 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Graficador de Ecuaciones</title>
+  <title>Resolución de Ecuaciones con Gráfica</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f2f2f2; }
-    canvas { background: white; border: 1px solid #ccc; }
-    input { width: 300px; padding: 5px; font-size: 16px; }
-    button { padding: 6px 12px; font-size: 16px; margin-left: 10px; }
-    .info { margin-top: 15px; padding: 10px; background: #fff; border: 1px solid #ccc; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+    input, button { font-size: 16px; padding: 6px; }
+    canvas { background: white; border: 1px solid #ccc; margin-top: 20px; }
+    .info { background: #fff; border: 1px solid #ccc; padding: 15px; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h2>Graficador de Ecuaciones Lineales y Cuadráticas</h2>
-  <p>Escribe una ecuación en función de <strong>x</strong> (ejemplo: <code>2x + 3</code> o <code>x^2 - 4</code>)</p>
-  <input type="text" id="funcion" placeholder="Ej: x^2 - 4x + 3">
+  <h2>Resolver y Graficar Ecuaciones</h2>
+  <p>Escribe una función en <strong>x</strong> (ej: <code>(x^2 - 4)/(x - 2)</code>, <code>sin(x)</code>, <code>1/(x^2 - 4)</code>)</p>
+  <input type="text" id="funcion" size="40" placeholder="Ej: (x^2 - 4)/(x - 2)">
   <button onclick="graficar()">Graficar</button>
 
-  <div class="info" id="salida"></div>
-  <canvas id="grafica" width="600" height="400"></canvas>
+  <div class="info" id="resultado"></div>
+  <canvas id="grafico" width="700" height="400"></canvas>
 
   <script>
     function graficar() {
-      const input = document.getElementById("funcion").value;
-      const expr = math.parse(input.replace(/x/g, "(x)"));
+      const exprInput = document.getElementById("funcion").value;
+      const expr = math.parse(exprInput.replace(/x/g, "(x)"));
       const f = expr.compile();
-      const xVals = [], yVals = [];
-      const minX = -20, maxX = 20;
-      let minY = Infinity, maxY = -Infinity;
-      let asintotasV = new Set();
-      let tieneAsintotaH = false;
+
+      let xVals = [], yVals = [];
       let dominio = [], rango = [];
+      let asintotasV = new Set();
+      let minX = -20, maxX = 20, minY = Infinity, maxY = -Infinity;
 
       for (let x = minX; x <= maxX; x += 0.1) {
         try {
-          const y = f.evaluate({ x });
+          let y = f.evaluate({ x });
           if (!isFinite(y)) {
-            xVals.push(x);
             yVals.push(null);
             asintotasV.add(x.toFixed(2));
           } else {
@@ -49,56 +46,48 @@
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
           }
-        } catch (e) {
-          xVals.push(x);
+        } catch {
           yVals.push(null);
         }
       }
 
-      // Cálculo de raíces reales
+      // Calcular raíces reales (si se puede)
       let raices = "";
       try {
-        const eq = math.simplify(`${input} = 0`);
-        const x = math.symbolicSolve(eq.toString(), 'x');
+        const solucion = math.simplify(`${exprInput} = 0`);
+        const x = math.symbolicSolve(solucion.toString(), 'x');
         if (Array.isArray(x) && x.length > 0) {
           raices = "Raíces reales: " + x.map(r => r.toString()).join(", ");
         } else {
           raices = "No hay raíces reales.";
         }
-      } catch (e) {
+      } catch {
         raices = "No se pudieron calcular raíces.";
       }
 
-      // Cálculo de dominio
-      let dominioTexto = asintotasV.size > 0
-        ? "ℝ excepto " + [...asintotasV].join(", ")
-        : "Todos los números reales ℝ";
-
-      // Rango aproximado
-      let rangoTexto = `Aproximadamente desde ${minY.toFixed(2)} hasta ${maxY.toFixed(2)}`;
-
-      // Asíntotas horizontales: solo si y se aproxima a un valor constante (solo racionales típicos)
-      if (input.includes("/")) {
-        let limitePos = f.evaluate({ x: 100000 });
-        let limiteNeg = f.evaluate({ x: -100000 });
-        if (Math.abs(limitePos - limiteNeg) < 0.1 && isFinite(limitePos)) {
-          tieneAsintotaH = true;
+      // Asíntota horizontal (numéricamente)
+      let asintotaH = "Ninguna";
+      try {
+        let yPos = f.evaluate({ x: 1e6 });
+        let yNeg = f.evaluate({ x: -1e6 });
+        if (isFinite(yPos) && isFinite(yNeg) && Math.abs(yPos - yNeg) < 0.1) {
+          asintotaH = `y = ${((yPos + yNeg) / 2).toFixed(2)}`;
         }
-      }
+      } catch {}
 
       // Mostrar resultados
-      document.getElementById("salida").innerHTML = `
-        <strong>Función:</strong> f(x) = ${input}<br>
+      document.getElementById("resultado").innerHTML = `
+        <strong>Función:</strong> f(x) = ${exprInput}<br>
         <strong>${raices}</strong><br>
-        <strong>Dominio:</strong> ${dominioTexto}<br>
-        <strong>Rango:</strong> ${rangoTexto}<br>
-        <strong>Asíntotas verticales:</strong> ${[...asintotasV].length > 0 ? [...asintotasV].join(", ") : "Ninguna"}<br>
-        <strong>Asíntota horizontal:</strong> ${tieneAsintotaH ? "Sí (aproximada)" : "Ninguna"}
+        <strong>Dominio:</strong> ${asintotasV.size > 0 ? "ℝ excepto x = " + [...asintotasV].join(", ") : "Todos los reales ℝ"}<br>
+        <strong>Rango aproximado:</strong> de ${minY.toFixed(2)} a ${maxY.toFixed(2)}<br>
+        <strong>Asíntotas verticales:</strong> ${asintotasV.size > 0 ? [...asintotasV].join(", ") : "Ninguna"}<br>
+        <strong>Asíntota horizontal:</strong> ${asintotaH}
       `;
 
-      // Gráfica
+      // Dibujar gráfica
       if (window.miGrafico) window.miGrafico.destroy();
-      const ctx = document.getElementById("grafica").getContext("2d");
+      const ctx = document.getElementById("grafico").getContext("2d");
       window.miGrafico = new Chart(ctx, {
         type: 'line',
         data: {
@@ -115,21 +104,12 @@
         options: {
           responsive: false,
           plugins: {
-            legend: { display: true },
-            title: { display: true, text: `Gráfica de f(x) = ${input}` }
+            title: { display: true, text: `f(x) = ${exprInput}` },
+            legend: { display: false }
           },
           scales: {
-            x: {
-              type: 'linear',
-              min: minX,
-              max: maxX,
-              title: { display: true, text: 'x' },
-              grid: { color: '#ccc' }
-            },
-            y: {
-              title: { display: true, text: 'f(x)' },
-              grid: { color: '#ccc' }
-            }
+            x: { type: 'linear', min: minX, max: maxX, title: { display: true, text: 'x' } },
+            y: { title: { display: true, text: 'f(x)' } }
           }
         }
       });
@@ -138,7 +118,5 @@
 </body>
 </html>
 
-       
-
-    
-              
+      
+      
