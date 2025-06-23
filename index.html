@@ -2,117 +2,133 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Graficador de Ecuaciones</title>
+  <title>Bot de Ecuaciones Lineales y Cuadráticas</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f4f4f4;
+      background: #eef2f3;
       padding: 20px;
     }
-    label, input, select, button {
-      margin: 5px;
+    input, button {
       font-size: 16px;
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      max-width: 400px;
     }
     #grafico {
-      margin-top: 20px;
       width: 100%;
-      max-width: 800px;
+      max-width: 700px;
       height: 400px;
-    }
-    #output {
       margin-top: 20px;
-      font-weight: bold;
+    }
+    #salida, #bot {
+      background: #fff;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #ccc;
+      max-width: 700px;
     }
   </style>
 </head>
 <body>
 
-  <h2>Graficador de Ecuaciones Lineales y Cuadráticas</h2>
+<h2>Resolver Ecuaciones Lineales y Cuadráticas</h2>
 
-  <label for="tipo">Tipo de ecuación:</label>
-  <select id="tipo" onchange="cambiarTipo()">
-    <option value="lineal">Lineal (y = mx + b)</option>
-    <option value="cuadratica">Cuadrática (y = ax² + bx + c)</option>
-  </select><br>
+<p>Ejemplo: <code>2*x + 5 = 0</code> o <code>x^2 + 3*x + 2 = 0</code></p>
 
-  <label for="a">a / m:</label>
-  <input type="number" id="a" value="1"><br>
+<input type="text" id="ecuacion" placeholder="Escribe la ecuación aquí">
+<button onclick="resolverEcuacion()">Resolver y Graficar</button>
 
-  <label for="b">b:</label>
-  <input type="number" id="b" value="0"><br>
+<div id="bot"></div>
+<div id="grafico"></div>
+<div id="salida"></div>
 
-  <div id="campoC">
-    <label for="c">c:</label>
-    <input type="number" id="c" value="0"><br>
-  </div>
+<script>
+function resolverEcuacion() {
+  const input = document.getElementById("ecuacion").value;
+  const lhs_rhs = input.split("=");
 
-  <button onclick="graficar()">Graficar</button>
+  if (lhs_rhs.length !== 2) {
+    document.getElementById("bot").innerHTML = "⚠️ La ecuación debe tener un signo '='.";
+    return;
+  }
 
-  <div id="grafico"></div>
-  <div id="output"></div>
+  const lhs = lhs_rhs[0];
+  const rhs = lhs_rhs[1];
 
-  <script>
-    function cambiarTipo() {
-      const tipo = document.getElementById("tipo").value;
-      const campoC = document.getElementById("campoC");
-      campoC.style.display = (tipo === "cuadratica") ? "block" : "none";
+  const expr = math.simplify(lhs + "-(" + rhs + ")");
+  const simplified = expr.toString(); // Ecuación simplificada
+  const grado = math.derivative(simplified, 'x').toString().includes('x') ? 2 : 1;
+
+  let pasos = "";
+  let soluciones = [];
+
+  if (grado === 1) {
+    pasos += "<h3>🧠 Resolviendo ecuación lineal paso a paso:</h3>";
+    pasos += `<p>1. Pasamos todos los términos a un solo lado: <strong>${lhs} = ${rhs}</strong> ⇒ <strong>${simplified} = 0</strong></p>`;
+    soluciones = math.solve(simplified, 'x');
+    pasos += `<p>2. Despejamos x. Solución: <strong>x = ${soluciones[0]}</strong></p>`;
+  } else {
+    pasos += "<h3>🧠 Resolviendo ecuación cuadrática paso a paso:</h3>";
+    pasos += `<p>1. Pasamos todo al lado izquierdo: <strong>${lhs} = ${rhs}</strong> ⇒ <strong>${simplified} = 0</strong></p>`;
+    const a = math.evaluate(`coefficient(${simplified}, x, 2)`);
+    const b = math.evaluate(`coefficient(${simplified}, x, 1)`);
+    const c = math.evaluate(`coefficient(${simplified}, x, 0)`);
+    const discriminante = b*b - 4*a*c;
+
+    pasos += `<p>2. Identificamos: a = ${a}, b = ${b}, c = ${c}</p>`;
+    pasos += `<p>3. Calculamos el discriminante: D = b² - 4ac = ${discriminante}</p>`;
+
+    if (discriminante < 0) {
+      pasos += "<p>4. El discriminante es negativo, no hay soluciones reales.</p>";
+    } else {
+      const x1 = ((-b + Math.sqrt(discriminante)) / (2*a)).toFixed(4);
+      const x2 = ((-b - Math.sqrt(discriminante)) / (2*a)).toFixed(4);
+      soluciones = [x1, x2];
+      pasos += `<p>4. Aplicamos la fórmula general: x = (-b ± √D) / 2a</p>`;
+      pasos += `<p>5. Soluciones: <strong>x₁ = ${x1}, x₂ = ${x2}</strong></p>`;
     }
+  }
 
-    function graficar() {
-      const tipo = document.getElementById("tipo").value;
-      const a = parseFloat(document.getElementById("a").value);
-      const b = parseFloat(document.getElementById("b").value);
-      const c = parseFloat(document.getElementById("c").value);
+  document.getElementById("bot").innerHTML = pasos;
 
-      const x = [];
-      const y = [];
+  // Graficar
+  const x = [], y = [];
+  for (let i = -20; i <= 20; i += 0.1) {
+    x.push(i);
+    y.push(math.evaluate(simplified, {x: i}));
+  }
 
-      // Generar valores de x e y
-      for (let i = -20; i <= 20; i += 0.1) {
-        x.push(i);
-        if (tipo === "lineal") {
-          y.push(a * i + b);
-        } else {
-          y.push(a * i * i + b * i + c);
-        }
-      }
+  const minY = Math.min(...y).toFixed(2);
+  const maxY = Math.max(...y).toFixed(2);
 
-      // Calcular mínimo y máximo del rango
-      const minY = Math.min(...y).toFixed(2);
-      const maxY = Math.max(...y).toFixed(2);
+  Plotly.newPlot("grafico", [{
+    x: x,
+    y: y,
+    mode: "lines",
+    name: "f(x)"
+  }], {
+    title: "Gráfica de la función",
+    xaxis: { title: "x", range: [-20, 20] },
+    yaxis: { title: "y" }
+  });
 
-      // Crear trazado
-      const trace = {
-        x: x,
-        y: y,
-        mode: "lines",
-        name: "Función",
-        line: { color: 'blue' }
-      };
-
-      const layout = {
-        title: tipo === "lineal" ? `y = ${a}x + ${b}` : `y = ${a}x² + ${b}x + ${c}`,
-        xaxis: { title: "x", range: [-20, 20] },
-        yaxis: { title: "y" }
-      };
-
-      Plotly.newPlot("grafico", [trace], layout);
-
-      // Mostrar dominio y rango
-      document.getElementById("output").innerHTML = `
-        <p><strong>Dominio:</strong> [−20, 20]</p>
-        <p><strong>Rango:</strong> [${minY}, ${maxY}]</p>
-      `;
-    }
-
-    // Inicializar
-    cambiarTipo();
-  </script>
+  document.getElementById("salida").innerHTML = `
+    <p><strong>Dominio:</strong> [−20, 20]</p>
+    <p><strong>Rango aproximado:</strong> [${minY}, ${maxY}]</p>
+    <p><strong>Soluciones reales:</strong> ${soluciones.length > 0 ? soluciones.join(", ") : "Ninguna"}</p>
+  `;
+}
+</script>
 
 </body>
 </html>
 
-  
-  
       
+ 
+     
+   
