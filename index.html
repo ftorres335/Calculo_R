@@ -2,133 +2,109 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Bot de Ecuaciones Lineales y Cuadráticas</title>
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.min.js"></script>
+  <title>Graficador de Ecuaciones</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #eef2f3;
-      padding: 20px;
-    }
-    input, button {
-      font-size: 16px;
-      padding: 8px;
-      margin: 5px 0;
-      width: 100%;
-      max-width: 400px;
-    }
-    #grafico {
-      width: 100%;
-      max-width: 700px;
-      height: 400px;
-      margin-top: 20px;
-    }
-    #salida, #bot {
-      background: #fff;
-      padding: 15px;
-      margin-top: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px #ccc;
-      max-width: 700px;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f2f2f2; }
+    canvas { background: white; border: 1px solid #ccc; }
+    input { width: 300px; padding: 5px; font-size: 16px; }
+    button { padding: 6px 12px; font-size: 16px; margin-left: 10px; }
   </style>
 </head>
 <body>
+  <h2>Graficador de Ecuaciones Lineales y Cuadráticas</h2>
+  <p>Escribe una ecuación en función de <strong>x</strong> (ejemplo: <code>2x + 3</code> o <code>x^2 - 4</code>)</p>
+  <input type="text" id="funcion" placeholder="Ej: x^2 - 4x + 3">
+  <button onclick="graficar()">Graficar</button>
+  <p id="soluciones"></p>
+  <canvas id="grafica" width="600" height="400"></canvas>
 
-<h2>Resolver Ecuaciones Lineales y Cuadráticas</h2>
+  <script>
+    function graficar() {
+      const input = document.getElementById("funcion").value;
+      const expr = math.parse(input.replace(/x/g, "(x)"));
+      const f = expr.compile();
+      const xVals = [], yVals = [];
+      const minX = -20, maxX = 20;
+      let asintotasH = [], asintotasV = [];
 
-<p>Ejemplo: <code>2*x + 5 = 0</code> o <code>x^2 + 3*x + 2 = 0</code></p>
+      for (let x = minX; x <= maxX; x += 0.1) {
+        try {
+          const y = f.evaluate({ x });
+          if (Math.abs(y) < 1e5) {
+            xVals.push(x);
+            yVals.push(y);
+          } else {
+            xVals.push(x);
+            yVals.push(null); // Para mostrar una ruptura en la gráfica
+            if (!asintotasV.includes(x.toFixed(2))) {
+              asintotasV.push(x.toFixed(2));
+            }
+          }
+        } catch {
+          xVals.push(x);
+          yVals.push(null);
+        }
+      }
 
-<input type="text" id="ecuacion" placeholder="Escribe la ecuación aquí">
-<button onclick="resolverEcuacion()">Resolver y Graficar</button>
+      // Resolver raíces reales
+      let raices = "";
+      try {
+        const eq = math.simplify(`${input} = 0`);
+        const x = math.symbolicSolve(eq.toString(), 'x');
+        if (Array.isArray(x) && x.length > 0) {
+          raices = "Raíces reales: " + x.map(r => r.toString()).join(", ");
+        } else {
+          raices = "No hay raíces reales.";
+        }
+      } catch (e) {
+        raices = "No se pudieron calcular raíces.";
+      }
+      document.getElementById("soluciones").textContent = raices;
 
-<div id="bot"></div>
-<div id="grafico"></div>
-<div id="salida"></div>
-
-<script>
-function resolverEcuacion() {
-  const input = document.getElementById("ecuacion").value;
-  const lhs_rhs = input.split("=");
-
-  if (lhs_rhs.length !== 2) {
-    document.getElementById("bot").innerHTML = "⚠️ La ecuación debe tener un signo '='.";
-    return;
-  }
-
-  const lhs = lhs_rhs[0];
-  const rhs = lhs_rhs[1];
-
-  const expr = math.simplify(lhs + "-(" + rhs + ")");
-  const simplified = expr.toString(); // Ecuación simplificada
-  const grado = math.derivative(simplified, 'x').toString().includes('x') ? 2 : 1;
-
-  let pasos = "";
-  let soluciones = [];
-
-  if (grado === 1) {
-    pasos += "<h3>🧠 Resolviendo ecuación lineal paso a paso:</h3>";
-    pasos += `<p>1. Pasamos todos los términos a un solo lado: <strong>${lhs} = ${rhs}</strong> ⇒ <strong>${simplified} = 0</strong></p>`;
-    soluciones = math.solve(simplified, 'x');
-    pasos += `<p>2. Despejamos x. Solución: <strong>x = ${soluciones[0]}</strong></p>`;
-  } else {
-    pasos += "<h3>🧠 Resolviendo ecuación cuadrática paso a paso:</h3>";
-    pasos += `<p>1. Pasamos todo al lado izquierdo: <strong>${lhs} = ${rhs}</strong> ⇒ <strong>${simplified} = 0</strong></p>`;
-    const a = math.evaluate(`coefficient(${simplified}, x, 2)`);
-    const b = math.evaluate(`coefficient(${simplified}, x, 1)`);
-    const c = math.evaluate(`coefficient(${simplified}, x, 0)`);
-    const discriminante = b*b - 4*a*c;
-
-    pasos += `<p>2. Identificamos: a = ${a}, b = ${b}, c = ${c}</p>`;
-    pasos += `<p>3. Calculamos el discriminante: D = b² - 4ac = ${discriminante}</p>`;
-
-    if (discriminante < 0) {
-      pasos += "<p>4. El discriminante es negativo, no hay soluciones reales.</p>";
-    } else {
-      const x1 = ((-b + Math.sqrt(discriminante)) / (2*a)).toFixed(4);
-      const x2 = ((-b - Math.sqrt(discriminante)) / (2*a)).toFixed(4);
-      soluciones = [x1, x2];
-      pasos += `<p>4. Aplicamos la fórmula general: x = (-b ± √D) / 2a</p>`;
-      pasos += `<p>5. Soluciones: <strong>x₁ = ${x1}, x₂ = ${x2}</strong></p>`;
+      // Gráfica con Chart.js
+      if (window.miGrafico) window.miGrafico.destroy();
+      const ctx = document.getElementById("grafica").getContext("2d");
+      window.miGrafico = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: xVals,
+          datasets: [{
+            label: 'f(x)',
+            data: yVals,
+            borderColor: 'blue',
+            borderWidth: 2,
+            fill: false,
+            spanGaps: false
+          }]
+        },
+        options: {
+          responsive: false,
+          plugins: {
+            legend: { display: true },
+            title: { display: true, text: `Gráfica de f(x) = ${input}` }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              min: minX,
+              max: maxX,
+              title: { display: true, text: 'x' },
+              grid: { color: '#ccc' }
+            },
+            y: {
+              title: { display: true, text: 'f(x)' },
+              grid: { color: '#ccc' }
+            }
+          }
+        }
+      });
     }
-  }
-
-  document.getElementById("bot").innerHTML = pasos;
-
-  // Graficar
-  const x = [], y = [];
-  for (let i = -20; i <= 20; i += 0.1) {
-    x.push(i);
-    y.push(math.evaluate(simplified, {x: i}));
-  }
-
-  const minY = Math.min(...y).toFixed(2);
-  const maxY = Math.max(...y).toFixed(2);
-
-  Plotly.newPlot("grafico", [{
-    x: x,
-    y: y,
-    mode: "lines",
-    name: "f(x)"
-  }], {
-    title: "Gráfica de la función",
-    xaxis: { title: "x", range: [-20, 20] },
-    yaxis: { title: "y" }
-  });
-
-  document.getElementById("salida").innerHTML = `
-    <p><strong>Dominio:</strong> [−20, 20]</p>
-    <p><strong>Rango aproximado:</strong> [${minY}, ${maxY}]</p>
-    <p><strong>Soluciones reales:</strong> ${soluciones.length > 0 ? soluciones.join(", ") : "Ninguna"}</p>
-  `;
-}
-</script>
-
+  </script>
 </body>
 </html>
 
       
- 
-     
-   
+
+  
